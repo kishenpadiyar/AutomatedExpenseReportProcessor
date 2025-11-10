@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
 import re
+import os
 from datetime import datetime
 
 # Try to import EasyOCR
@@ -24,9 +25,14 @@ app = FastAPI(
 )
 
 # Add CORS middleware to allow frontend requests
+# For production, add your frontend domain to allow_origins
+# Example: allow_origins=["http://localhost:5173", "https://yourdomain.com"]
+# Note: Using "*" with allow_credentials=True is not allowed, so specify origins explicitly
+# Set ALLOWED_ORIGINS environment variable to add production domains (comma-separated)
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

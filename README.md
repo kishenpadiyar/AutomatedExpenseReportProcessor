@@ -88,6 +88,13 @@ If you encounter compilation errors when installing EasyOCR:
   - Accepts: image file (multipart/form-data)
   - Returns: JSON with `status`, `extracted_text`, and `processed_time_ms`
 
+## Deployment
+
+For deploying to a production website, see [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on:
+- Configuring the backend API URL
+- Setting up CORS for production
+- Environment variable configuration
+
 ## Technology Stack
 
 - **Backend**: FastAPI, EasyOCR, Python

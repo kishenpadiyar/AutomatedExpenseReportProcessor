@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { appConfig } from './src/config'
 
 function App() {
@@ -11,6 +11,10 @@ function App() {
   const [error, setError] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [showRawText, setShowRawText] = useState(false)
+  const [isCameraSupported, setIsCameraSupported] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
+  const [cameraStream, setCameraStream] = useState(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0]
@@ -59,7 +63,10 @@ function App() {
       const formData = new FormData()
       formData.append('file', selectedFile)
 
-      const response = await fetch('http://localhost:8000/api/v1/ocr/extract_structured', {
+      // Use environment variable for API URL, fallback to localhost for development
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      
+      const response = await fetch(`${API_URL}/api/v1/ocr/extract_structured`, {
         method: 'POST',
         body: formData,
       })
@@ -110,6 +117,139 @@ function App() {
       currency: currency || 'USD',
     }).format(amount)
   }
+
+  // Check if device is mobile and camera is supported
+  const checkCameraSupport = () => {
+    // Check if running on mobile device
+    const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
+    const isMobileDevice = mobileRegex.test(navigator.userAgent) || window.innerWidth <= 768
+    setIsMobile(isMobileDevice)
+    
+    // Check if camera API is available
+    const hasCamera = navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+    setIsCameraSupported(hasCamera && isMobileDevice)
+  }
+
+  // Handle camera capture
+  const handleCameraCapture = async () => {
+    try {
+      // Request camera access (prefer back camera for receipts)
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment', // Back camera
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      })
+      setCameraStream(stream)
+      setShowCamera(true)
+      setError(null)
+    } catch (err) {
+      console.error('Camera access error:', err)
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setError('Camera permission denied. Please allow camera access in your browser settings.')
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError('No camera found on this device.')
+      } else {
+        setError(`Camera error: ${err.message}`)
+      }
+      setShowCamera(false)
+    }
+  }
+
+  // Capture photo from camera stream
+  const capturePhoto = () => {
+    const video = document.getElementById('camera-preview')
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0)
+    
+    // Convert canvas to blob, then to File
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `camera-capture-${Date.now()}.jpg`, { type: 'image/jpeg' })
+        setSelectedFile(file)
+        setError(null)
+        setStructuredResult(null)
+        setShowRawText(false)
+      }
+    }, 'image/jpeg', 0.9)
+    
+    // Stop camera stream and close preview
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop())
+      setCameraStream(null)
+    }
+    setShowCamera(false)
+  }
+
+  // Close camera preview
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop())
+      setCameraStream(null)
+    }
+    setShowCamera(false)
+  }
+
+  // Toggle between front and back camera
+  const toggleCamera = async () => {
+    if (!cameraStream) return
+    
+    try {
+      // Stop current stream
+      cameraStream.getTracks().forEach(track => track.stop())
+      
+      // Get current facing mode
+      const currentFacingMode = cameraStream.getVideoTracks()[0]?.getSettings().facingMode
+      const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user'
+      
+      // Request new stream with opposite camera
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: newFacingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      })
+      setCameraStream(stream)
+    } catch (err) {
+      console.error('Camera toggle error:', err)
+      setError(`Failed to switch camera: ${err.message}`)
+    }
+  }
+
+  // Initialize camera support check on component mount
+  useEffect(() => {
+    checkCameraSupport()
+    // Re-check on window resize
+    window.addEventListener('resize', checkCameraSupport)
+    return () => window.removeEventListener('resize', checkCameraSupport)
+  }, [])
+
+  // Cleanup camera stream when component unmounts or camera is closed
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [cameraStream])
+
+  // Set video source when camera stream is available
+  useEffect(() => {
+    const video = document.getElementById('camera-preview')
+    if (video && cameraStream) {
+      video.srcObject = cameraStream
+    }
+    return () => {
+      if (video) {
+        video.srcObject = null
+      }
+    }
+  }, [cameraStream, showCamera])
 
   const capitalizeFirst = (str) => {
     if (!str) return ''
@@ -547,6 +687,26 @@ function App() {
             </div>
           </div>
 
+          {/* Camera Capture Button (Mobile Only) */}
+          {isCameraSupported && (
+            <div className="mt-6">
+              <button
+                onClick={handleCameraCapture}
+                className={`w-full sm:w-auto px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+                  darkMode
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                } shadow-md hover:shadow-lg`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 001.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Take Photo
+              </button>
+            </div>
+          )}
+
           {/* Selected File Name */}
           {selectedFile && (
             <div className={`mt-6 p-4 border rounded-lg transition-colors duration-200 ${
@@ -878,6 +1038,61 @@ function App() {
       </div>
       <Footer />
       
+      {/* Camera Preview Modal */}
+      {showCamera && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* Camera Preview */}
+          <div className="flex-1 relative flex items-center justify-center">
+            <video
+              id="camera-preview"
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Camera Controls Overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+              <div className="flex items-center justify-center gap-6">
+                {/* Cancel Button */}
+                <button
+                  onClick={closeCamera}
+                  className={`p-4 rounded-full transition-all duration-200 ${
+                    darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-600'
+                  } text-white`}
+                  aria-label="Close camera"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                
+                {/* Capture Button */}
+                <button
+                  onClick={capturePhoto}
+                  className="p-6 rounded-full bg-white border-4 border-gray-300 hover:border-gray-400 transition-all duration-200"
+                  aria-label="Capture photo"
+                >
+                  <div className="w-16 h-16 rounded-full bg-white"></div>
+                </button>
+                
+                {/* Flip Camera Button */}
+                <button
+                  onClick={toggleCamera}
+                  className={`p-4 rounded-full transition-all duration-200 ${
+                    darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-600'
+                  } text-white`}
+                  aria-label="Flip camera"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Floating Home Icon */}
       <button
         onClick={() => setCurrentPage('landing')}
@@ -1062,6 +1277,29 @@ function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </a>
+          </div>
+        </div>
+
+        {/* Disclaimer Section */}
+        <div className={`rounded-lg shadow-md p-6 sm:p-8 transition-all duration-200 ${
+          darkMode 
+            ? 'bg-gradient-to-br from-gray-800 to-gray-800/90' 
+            : 'bg-gradient-to-br from-white to-gray-50/50'
+        }`}>
+          <h3 className={`text-lg sm:text-xl font-semibold mb-4 transition-colors duration-200 ${
+            darkMode ? 'text-white' : 'text-gray-900'
+          }`}>
+            Project Status and Disclaimer
+          </h3>
+          <div className={`text-sm sm:text-base leading-relaxed space-y-3 transition-colors duration-200 ${
+            darkMode ? 'text-gray-300' : 'text-gray-700'
+          }`}>
+            <p>
+              ReceiptSense is developed and maintained solely as a personal learning project and portfolio demonstration to showcase skills in OCR integration, structured data processing, and modern UI development (React/FastAPI).
+            </p>
+            <p>
+              The application is not intended for commercial use, profit generation, or sale. The results are provided "as-is," and users should not rely on the extracted data for critical business or financial purposes.
+            </p>
           </div>
         </div>
       </div>
