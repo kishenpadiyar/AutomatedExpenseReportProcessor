@@ -29,7 +29,7 @@ app = FastAPI(
 # Example: allow_origins=["http://localhost:5173", "https://yourdomain.com"]
 # Note: Using "*" with allow_credentials=True is not allowed, so specify origins explicitly
 # Set ALLOWED_ORIGINS environment variable to add production domains (comma-separated)
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://receiptsense-e107tvbip-kishenpadiyars-projects.vercel.app").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
