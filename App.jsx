@@ -51,7 +51,17 @@ function App() {
         const data = await response.json()
         setOcrResult(data)
       } else {
-        setError(`API Error: Could not process receipt. Check server status. (Status: ${response.status})`)
+        // Get error message from response
+        let errorMessage = `API Error: Could not process receipt. (Status: ${response.status})`
+        try {
+          const errorData = await response.json()
+          if (errorData.detail) {
+            errorMessage = errorData.detail
+          }
+        } catch (e) {
+          // If response is not JSON, use default message
+        }
+        setError(errorMessage)
       }
     } catch (err) {
       setError(`Error: ${err.message}. Please ensure the backend server is running.`)
