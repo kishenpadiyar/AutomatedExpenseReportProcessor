@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: receiptsense-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ALLOWED_ORIGINS
+        value: https://your-vercel-app.vercel.app
+    # IMPORTANT: EasyOCR requires at least 1GB RAM
+    # Free tier (512MB) will fail - upgrade to Starter ($7/month) or Standard ($25/month)
+    # You must manually select a paid plan in Render dashboard (Settings → Plan)
+    # This file doesn't set the plan - you need to upgrade in the Render dashboard
+

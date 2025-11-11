@@ -65,8 +65,15 @@ function App() {
 
       // Use environment variable for API URL, fallback to localhost for development
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const apiEndpoint = `${API_URL}/api/v1/ocr/extract_structured`
       
-      const response = await fetch(`${API_URL}/api/v1/ocr/extract_structured`, {
+      // Debug logging (only in development)
+      if (import.meta.env.DEV) {
+        console.log('API URL:', API_URL)
+        console.log('Full endpoint:', apiEndpoint)
+      }
+      
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         body: formData,
       })
@@ -85,12 +92,29 @@ function App() {
           // If response is not JSON, use default message
           if (response.status === 404) {
             errorMessage = `Endpoint not found (404). Please ensure the backend is running with the latest code.`
+          } else if (response.status === 0) {
+            errorMessage = `Network error: Unable to connect to backend. Check if the backend server is running and accessible at ${API_URL}`
           }
         }
         setError(errorMessage)
       }
     } catch (err) {
-      setError(`Error: ${err.message}. Please ensure the backend server is running.`)
+      // Enhanced error handling
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      let errorMessage = `Error: ${err.message}`
+      
+      if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+        errorMessage = `Failed to connect to backend server at ${API_URL}. ` +
+          `Please ensure: ` +
+          `1) The backend server is running, ` +
+          `2) The API URL is correct (check VITE_API_URL environment variable), ` +
+          `3) CORS is properly configured on the backend, ` +
+          `4) The backend is accessible from your current location.`
+      }
+      
+      setError(errorMessage)
+      console.error('API Error:', err)
+      console.error('API URL used:', import.meta.env.VITE_API_URL || 'http://localhost:8000')
     } finally {
       setIsLoading(false)
     }

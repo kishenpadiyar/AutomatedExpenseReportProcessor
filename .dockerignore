@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Other
+.env
+.env.local
+*.log
+
+# Frontend files (not needed for backend)
+App.jsx
+src/
+public/
+index.html
+vite.config.js
+tailwind.config.js
+postcss.config.js
+package.json
+package-lock.json
+
